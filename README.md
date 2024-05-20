@@ -28,9 +28,9 @@ OR copy the following in pom.xml
 
 #### Approach 1 - Use Default Username and Password for Authentication
 
-- Start the application and note the generated password in the console
+- Start the application and note the generated password in the terminal
     - Copy the password
-    - Open the app in the browser; login page should open
+    - Open the app in the browser by copying the URL and appending ``/login``; the login page should open
     - Enter username: ``user`` and password:``{copied password}`` to get access to the endpoint
 
 - This approach has some drawbacks. Hence, used only for unit testing purposes.
@@ -42,15 +42,17 @@ OR copy the following in pom.xml
 Let's try a better approach of defining our own username and password.
 - Enter the following properties in resources/application.properties
 ```Properties
-spring.security.user.name=${myusername}
-spring.security.user.password=${mypassword}
+spring.security.user.name=${MYUSERNAME}
+spring.security.user.password=${MYPASSWORD}
 ```
-- Run the app and enter these details on the login page
-- It's not safe to save username and password directly. Let's create environment variables to store the username and password and inject them in the properties:
-    - Go to Repository Settings > Secrets and Variables
-    - Add New Repository Secrets
+- First, try to set custom username and password by replacing ``${MYUSERNAME}`` and ``${MYPASSWORD}``
+- However, it's not safe to save username and password directly. Let's create environment variables to store the username and password and inject them in the properties:
+    - Go to Repository Settings > Secrets and Variables, Codespaces
+    - Click on New Repository Secrets
         - Name: myusername, Value: ``{your username}``
         - Name: mypassword, Value: ``{your password}``
+- You will be prompted to re-build the container. If not, re-build it manually by clicking the codespace name in the left bottom corner and choosing the "Rebuild Container" command.
+- Run the app and enter the configured username and password on the login page
 - The drawback of this approach is that only one user can be created and roles cannot be assigned.
 
 #### Approach 3 - Add Security Config
@@ -59,18 +61,21 @@ Let's secure individual endpoints by creating some roles.
 - Add the following two GET mappings in the MyController.java:
 ```Java
 @GetMapping("/admin")
-public ResponseEntity<String> showAdminContent() {
-return new ResponseEntity<>("Only an admin can view this content.", HttpStatus.OK);
+public ResponseEntity<String> showAdminContent(Principal principal) {
+    String message = "Welcome, " + principal.getName() + "! <BR> Only an admin can view this content.";
+    return new ResponseEntity<>(message, HttpStatus.OK);
 }
 
-
 @GetMapping("/user")
-public ResponseEntity<String> showUserContent() {
-return new ResponseEntity<>("Only a user can view this content.", HttpStatus.OK);
+public ResponseEntity<String> showUserContent(Principal principal) {
+    String message = "Welcome, " + principal.getName() + "! <BR> Only a user can view this content.";
+    return new ResponseEntity<>(message, HttpStatus.OK);
 }
 ```
 
 OR let AI Copilot generate these suggestions for you 😊
+
+Next, we need to override the default security configuration included in Spring Boot. For that, we will have to create a custom configuration class.
 
 - Create Custom Security Config Class
     - Create a new package ``ch.fhnw.securitytest.security`` and a new class
@@ -120,8 +125,7 @@ Now we need to add a **Security Filter Chain** implementation.
                 .authorizeHttpRequests( auth -> auth
                         .requestMatchers("/securitytest/admin").hasRole("ADMIN") //note that the role need not be prefixed with "ROLE_"
                         .requestMatchers("/securitytest/user").hasRole("USER") //note that the role need not be prefixed with "ROLE_"
-                        .requestMatchers("/securitytest/**").permitAll()
-                        .anyRequest().hasAuthority("SCOPE_READ")            
+                        .requestMatchers("/securitytest/**").permitAll()            
                 )       
                 .formLogin(withDefaults()) //need to include a static import for withDefaults, see the imports at the top of the file
                 .httpBasic(withDefaults())
@@ -318,6 +322,7 @@ Let's add an endpoint in our controller to generate the token for authentication
         } else {
             throw new UsernameNotFoundException("invalid user request !");
         }
+    }
     ```
 
 Let's test the endpoints using Postman.
